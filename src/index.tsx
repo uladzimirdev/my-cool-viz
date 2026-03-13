@@ -3,49 +3,94 @@ import type {
   CustomVisualizationProps,
 } from "@metabase/custom-viz";
 
-type Settings = {};
+type ThumbsVizSettings = {
+  threshold?: number;
+};
 
-const createVisualization: CreateCustomVisualization<Settings> = () => {
+export const createThumbsViz: CreateCustomVisualization<ThumbsVizSettings> = ({ }) => {
   return {
-    id: "my-cool-viz",
-    getName: () => "my-cool-viz",
-    minSize: { width: 4, height: 3 },
-    defaultSize: { width: 6, height: 4 },
+    id: 'thumbs-viz',
+    getName: () => 'Thumbs',
+    minSize: { width: 1, height: 1 },
+    defaultSize: { width: 2, height: 2 },
     isSensible({ cols, rows }) {
-      return cols.length > 0 && rows.length > 0;
+      return cols.length === 1 && rows.length === 1 && typeof rows[0][0] === 'number';
     },
-    checkRenderable(series) {
-      if (series.length === 0) {
-        throw new Error("No data");
+    checkRenderable(series, settings) {
+      if (series.length !== 1) {
+        throw new Error('Only 1 series is supported');
+      }
+
+      const [
+        {
+          data: { cols, rows },
+        },
+      ] = series;
+
+      if (cols.length !== 1) {
+        throw new Error('Query results should only have 1 column');
+      }
+
+      if (rows.length !== 1) {
+        throw new Error('Query results should only have 1 row');
+      }
+
+      if (typeof rows[0][0] !== 'number') {
+        throw new Error('Result is not a number');
+      }
+
+      if (typeof settings.threshold !== 'number') {
+        throw new Error('Threshold setting is not set');
       }
     },
-    VisualizationComponent,
+    settings: {
+      threshold: {
+        id: '1',
+        widget: 'number',
+        title: 'Threshold',
+        getDefault() {
+          return 0;
+        },
+        getProps() {
+          return {
+            options: {
+              isInteger: false,
+              isNonNegative: false,
+            },
+            placeholder: 'Set threshold',
+          };
+        },
+      },
+    },
+    VisualizationComponent: ThumbsVizComponent,
   };
 };
 
-const VisualizationComponent = ({
-  series,
-  width,
-  height,
-}: CustomVisualizationProps<Settings>) => {
-  const rowCount = series[0]?.data.rows.length ?? 0;
+const ThumbsVizComponent = (props: CustomVisualizationProps<ThumbsVizSettings>) => {
+  const { height, series, settings, width } = props;
+  const { threshold } = settings;
+  const value = series[0].data.rows[0][0];
+
+  if (typeof value !== 'number' || typeof threshold !== 'number') {
+    throw new Error('Value and threshold need to be numbers');
+  }
+
+  const emoji = value >= threshold ? '👍' : '👎';
 
   return (
     <div
       style={{
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        alignItems: "center",
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
         width,
         height,
-        fontFamily: "sans-serif",
+        fontSize: 16,
       }}
     >
-      <h2>my-cool-viz</h2>
-      <p>{rowCount} rows</p>
+      {emoji}
     </div>
   );
 };
 
-export default createVisualization;
+export default createThumbsViz;
